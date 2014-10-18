@@ -35,62 +35,28 @@ public class ImageEncryption
     public static void main(String[] args) throws IOException, UnsupportedEncodingException, NoSuchAlgorithmException, NoSuchProviderException, InvalidAlgorithmParameterException, NoSuchPaddingException, InvalidKeyException, IllegalBlockSizeException, BadPaddingException
     {
         encrypt("in.jpg"); // generates the encrypted.txt file that contains all the encrypted pixel colors
-        decrypt("encrypt.txt"); // decrypts a text file that contains all the encrypted pixel colors
+        decrypt("encrypt.txt", "in.jpg"); // decrypts a text file that contains all the encrypted pixel colors
     }
 //insert proper headings from commenting style
-    public static void encrypt(String fileName) throws UnsupportedEncodingException, NoSuchAlgorithmException, NoSuchProviderException, NoSuchPaddingException, InvalidAlgorithmParameterException, InvalidKeyException, IllegalBlockSizeException, BadPaddingException
+    public static void encrypt(String fileName) throws UnsupportedEncodingException, NoSuchAlgorithmException, NoSuchProviderException, NoSuchPaddingException, InvalidAlgorithmParameterException, InvalidKeyException, IllegalBlockSizeException, BadPaddingException, IOException
     {
-		try
-		{
-			File file = new File(fileName); 
-			BufferedImage image = ImageIO.read(file); 
-                        
-                        int arrayLength = (image.getHeight() * image.getWidth());
-                        int [] colorArray = new int[arrayLength];
-                        int arrayInc = 0;
-                     
-                        for (int i = 0; i < image.getHeight(); i++)
-                            for (int j = 0; j < image.getWidth(); j++)
-                            {
-                                int color = image.getRGB(j,i);
-                                colorArray [arrayInc] = color;
-                                arrayInc++;
-                            }
-                        
-                        writeToFile("encrypt.txt","txt", image.getWidth(), image.getHeight(),encryptWithAES(integersToBytes(colorArray), encryptionKey));
-             
-		}catch (IOException e)
-		{
-                    e.printStackTrace();
-		} 
+        int width = getImageWidth(fileName);
+        int height = getImageHeight(fileName);
+        int [] colorArray = getColors(fileName, width, height);
+
+        writeToFile("encrypt.txt","txt", width, height, bytesToIntegers(encryptWithAES(integersToBytes(colorArray), encryptionKey)));
     }
 
-    public static void decrypt(String fileName)
+    public static void decrypt(String fileName, String imageName) throws IOException, UnsupportedEncodingException, NoSuchAlgorithmException, NoSuchProviderException, NoSuchPaddingException, InvalidAlgorithmParameterException, InvalidKeyException, IllegalBlockSizeException, BadPaddingException 
     {
-		try
-                {
-                    FileReader file = new FileReader(fileName);
-                    BufferedReader read = new BufferedReader(file);
-                    
-                    int numOfLines = readNumLines(read);
-                    
-                    String [] inputLine = readInFile(numOfLines, read);
-                    
-                    
-                   // writeToFileDecrypt(byteToIntegers("decrypt.jpg", decryptWithAES(convertStringToByte(readInFile(numOfLines)), encryptionKey)));
-                    /*byte [] encryptedBytes = new byte[numOfLines - 1];
-                    
-                    for(int i = 1; i < (numOfLines - 1); i++)
-                    {
-                        encryptedBytes[i] = read.readByte();
-                    }*/
-                    
-                    read.close();
-                }
-                catch (IOException e)
-                {
-                    e.printStackTrace();
-                }
+	int numOfLines = readNumLines(fileName);  
+        String [] inputLine = readInFile(numOfLines, fileName);
+        int [] encryptedIntegers = convertStringToInt(inputLine);
+        String header = getHeader(inputLine);  
+        int width = getImageWidth(imageName); 
+        int height = getImageHeight(imageName);
+        
+        createImage((bytesToIntegers(decryptWithAES((integersToBytes(encryptedIntegers)), encryptionKey))),width, height);
     }
 
     private static byte[] encryptWithAES(byte[] plainText, String encryptionKey) throws UnsupportedEncodingException, NoSuchAlgorithmException, NoSuchProviderException, NoSuchPaddingException, InvalidAlgorithmParameterException, InvalidKeyException, IllegalBlockSizeException, BadPaddingException
@@ -120,17 +86,14 @@ public class ImageEncryption
 
     private static int[] bytesToIntegers(byte[] bytes)
     {
-        IntBuffer intBuf =
-                ByteBuffer.wrap(bytes)
-                        .order(ByteOrder.BIG_ENDIAN)
-                        .asIntBuffer();
+        IntBuffer intBuf = ByteBuffer.wrap(bytes).order(ByteOrder.BIG_ENDIAN).asIntBuffer();
         int[] data = new int[intBuf.remaining()];
         intBuf.get(data);
 
         return data;
     }
 
-    public static void writeToFile(String fileName, String fileFormat, int width, int height, byte[] colorPixels) throws IOException
+    public static void writeToFile(String fileName, String fileFormat, int width, int height, int [] colorPixels) throws IOException
     {
         FileWriter fw = new FileWriter(fileName);
         BufferedWriter out = new BufferedWriter(fw);
@@ -149,25 +112,73 @@ public class ImageEncryption
         fw.close();
     }
     
-    /*public static void writeToFileDecrypt(String fileName, String fileFormat, int[] colorPixels) throws IOException
+    public static void createImage(int[] colorPixels, int width, int height) throws IOException
     {
-        FileWriter fw = new FileWriter(fileName);
-        BufferedWriter out = new BufferedWriter(fw);
+        BufferedImage image = new BufferedImage(width, height, BYTES_IN_DWORD);
         
-        String lineSpace = System.getProperty("line.separator"); //sequence used by operating system to separate lines in text files
-
-        String header = fileFormat + COMMA + width + COMMA + height + lineSpace; 
-        out.write(header);
-
-        for(int i = 0; i < colorPixels.length; i++)
-            out.write(colorPixels[i] + lineSpace);
-
-        out.close();
-        fw.close();
-    }*/
+        int arrayInc = 0;
+                     
+        for (int i = 0; i < height; i++)
+        {
+            for (int j = 0; j < width; j++)
+                {
+                    image.setRGB(j, i, colorPixels[arrayInc]);
+                    arrayInc++;
+                }
+        }
+        
+        File file = new File("decrypt.jpg");
+        ImageIO.write(image, "jpg", file);
+    }
     
-    public static int readNumLines(BufferedReader reader) throws IOException
+    public static int getImageWidth(String fileName) throws IOException
     {
+        File file = new File(fileName); 
+        BufferedImage image = ImageIO.read(file);
+        
+        int width = image.getWidth();
+        
+        return width;
+    }
+    
+    public static int getImageHeight(String fileName) throws IOException
+    {
+        File file = new File(fileName); 
+        BufferedImage image = ImageIO.read(file);
+        
+        int height = image.getHeight();
+        
+        return height;
+    }
+    
+    public static int [] getColors(String fileName, int width, int height) throws IOException
+    {
+        File file = new File(fileName); 
+        BufferedImage image = ImageIO.read(file);
+        
+        int arrayLength = (height * width);
+        
+            int [] colorArray = new int[arrayLength];
+            int arrayInc = 0;
+                     
+            for (int i = 0; i < height; i++)
+            {
+                for (int j = 0; j < width; j++)
+                    {
+                        int color = image.getRGB(j,i);
+                        colorArray [arrayInc] = color;
+                        arrayInc++;
+                    }
+            }
+        
+        return colorArray; 
+    }
+    
+    public static int readNumLines(String fileName) throws IOException
+    {
+        FileReader file = new FileReader(fileName);
+        BufferedReader reader = new BufferedReader(file);
+        
         String line = null;
         int numberOfLines = 0;
         
@@ -176,23 +187,45 @@ public class ImageEncryption
             numberOfLines++;
         }
         reader.close();
+        file.close();
         
         return numberOfLines;
     }
     
-    public static String[] readInFile(int arrayLength, BufferedReader reader) throws IOException
+    public static String[] readInFile(int arrayLength, String fileName) throws IOException
     {
+        FileReader file = new FileReader(fileName);
+        BufferedReader reader = new BufferedReader(file);
+        
         String [] encryptedString = new String [arrayLength];
         
-        
-        for(int i = 1; i < (encryptedString.length - 1); i++)
+        for(int i = 0; i < (encryptedString.length); i++)
                     {
                         encryptedString[i] = reader.readLine();
                     }
+        reader.close();
+        file.close();
+        
         return encryptedString;
     }
-   public static byte[] convertStringToByte(String [] encryptedString)
+    
+   public static int[] convertStringToInt(String [] encryptedString)
     {
+        int [] encryptedInt = new int [encryptedString.length - 1];
         
+        for(int i = 0; i < encryptedInt.length; i++)
+        {
+            encryptedInt[i] = Integer.valueOf(encryptedString[i + 1]);
+        }
+        
+        return encryptedInt;
     }
+   
+   public static String getHeader (String [] encryptedString)
+   {
+       String introLine = null;
+       introLine = encryptedString[0];
+       
+       return introLine; 
+   }
 }
